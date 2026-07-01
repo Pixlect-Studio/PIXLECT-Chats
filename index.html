@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIXLECT Home – Mail, Chat & Contacts</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --blue: #1a73e8;
+            --blue-hover: #1557b0;
+            --blue-light: #e8f0fe;
+            --gray: #5f6368;
+            --gray-border: #dadce0;
+            --white: #ffffff;
+            --bg: #f0f4f9;
+            --red: #d93025;
+            --shadow: 0 1px 3px rgba(0,0,0,0.12);
+            --shadow-lg: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Google Sans','Roboto',Arial,sans-serif;background:#f0f4f9;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#202124;}
+        .app-container{width:100%;max-width:448px;padding:20px;transition:max-width 0.3s;}
+        .app-container.wide{max-width:1000px;}
+        .card{background:var(--white);border-radius:28px;padding:48px 40px 36px;box-shadow:var(--shadow-lg);border:1px solid #e0e0e0;animation:fadeInUp 0.4s;}
+        @keyframes fadeInUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+        .logo-area{text-align:center;margin-bottom:24px;}
+        .logo-icon{width:56px;height:56px;margin:0 auto 8px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;font-weight:700;}
+        .logo-text{font-size:24px;font-weight:400;}
+        .logo-subtitle{font-size:14px;color:var(--gray);margin-top:4px;}
+        h1{font-size:24px;font-weight:400;margin-bottom:8px;text-align:center;}
+        .subtitle{font-size:14px;color:var(--gray);margin-bottom:24px;text-align:center;}
+        .input-group{margin-bottom:20px;}
+        label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;}
+        .input-wrapper{display:flex;align-items:center;border:1px solid var(--gray-border);border-radius:4px;padding:0 14px;height:52px;background:#fff;transition:0.2s;}
+        .input-wrapper:focus-within{border-color:var(--blue);box-shadow:0 0 0 2px rgba(26,115,232,0.2);}
+        .input-wrapper input{flex:1;border:none;outline:none;font-size:16px;}
+        .input-suffix{color:#5f6368;font-size:15px;font-weight:500;}
+        .error-msg{color:var(--red);font-size:12px;margin-top:6px;display:none;}
+        .error-msg.show{display:block;}
+        .btn{display:flex;align-items:center;justify-content:center;width:100%;padding:12px 24px;border-radius:24px;font-size:15px;font-weight:500;cursor:pointer;border:none;transition:0.2s;gap:10px;height:48px;}
+        .btn-primary{background:var(--blue);color:#fff;margin-top:8px;}
+        .btn-primary:hover{background:var(--blue-hover);}
+        .btn-outline{background:#fff;color:#202124;border:1px solid var(--gray-border);margin-top:8px;}
+        .btn:disabled{opacity:0.6;pointer-events:none;}
+        .spinner{width:18px;height:18px;border:2px solid transparent;border-top-color:currentColor;border-radius:50%;animation:spin 0.7s infinite;display:none;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        .btn.loading .spinner{display:inline-block;}
+        .btn.loading .btn-text{display:none;}
+        .divider{display:flex;align-items:center;margin:20px 0;gap:12px;color:#5f6368;font-size:13px;}
+        .divider::before,.divider::after{content:'';flex:1;height:1px;background:#dadce0;}
+        .links-row{display:flex;justify-content:center;gap:16px;margin-top:20px;}
+        .links-row a{font-size:13px;color:var(--gray);cursor:pointer;text-decoration:none;}
+        .hidden{display:none!important;}
+        .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:12px 24px;border-radius:24px;z-index:1000;animation:toastIn 0.3s,toastOut 0.3s 2.7s forwards;}
+        @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+        @keyframes toastOut{to{opacity:0;transform:translateX(-50%) translateY(10px);}}
+
+        /* App Bar */
+        .app-bar{background:#fff;border-bottom:1px solid #e0e0e0;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;}
+        .app-bar-nav a{padding:8px 16px;border-radius:20px;font-size:14px;color:#5f6368;cursor:pointer;text-decoration:none;}
+        .app-bar-nav a.active{color:var(--blue);background:#e8f0fe;font-weight:600;}
+        .avatar{width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;}
+
+        .panel{display:none;flex:1;flex-direction:column;}
+        .panel.active{display:flex;}
+
+        .inbox-container{background:#fff;border-radius:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;flex:1;margin:16px;overflow:hidden;}
+        .email-list{flex:1;overflow-y:auto;}
+        .email-item{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid #f1f3f4;cursor:pointer;}
+        .email-item.unread{background:#f8fbff;font-weight:600;}
+        .email-preview-pane{padding:20px;border-left:1px solid #e8eaed;flex:1;overflow-y:auto;display:none;background:#fff;}
+        .email-preview-pane.active{display:block;}
+
+        .chat-container{display:flex;flex:1;margin:16px;background:#fff;border-radius:16px;overflow:hidden;}
+        .chat-sidebar{width:220px;border-right:1px solid #e0e0e0;background:#fafbfc;display:flex;flex-direction:column;}
+        .chat-main{flex:1;display:flex;flex-direction:column;}
+        .chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;}
+        .chat-message{max-width:70%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.4;}
+        .chat-message.sent{background:var(--blue);color:#fff;align-self:flex-end;}
+        .chat-message.received{background:#f1f3f4;align-self:flex-start;}
+        .message-sender{font-size:11px;font-weight:500;margin-bottom:2px;opacity:0.8;}
+        .chat-message.sent .message-sender{text-align:right;color:#fff;}
+        .chat-input-container{padding:16px;border-top:1px solid #e0e0e0;display:flex;gap:8px;}
+        .chat-input-container input{flex:1;padding:10px;border:1px solid #dadce0;border-radius:20px;}
+
+        .contacts-container{flex:1;margin:16px;background:#fff;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;}
+        .contacts-list{flex:1;overflow-y:auto;}
+        .contact-item{display:flex;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #f1f3f4;}
+
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:500;}
+        .modal-overlay.active{display:flex;}
+        .modal{background:#fff;border-radius:16px;width:90%;max-width:500px;padding:24px;max-height:80vh;overflow-y:auto;}
+        .modal input, .modal textarea{width:100%;padding:8px;margin-bottom:8px;border:1px solid #dadce0;border-radius:4px;}
+
+        /* Footer */
+        .app-footer{background:#fafbfc;border-top:1px solid #e0e0e0;padding:12px 24px;display:flex;justify-content:center;align-items:center;gap:16px;font-size:12px;color:var(--gray);}
+        .app-footer a{color:var(--blue);cursor:pointer;text-decoration:none;}
+        .app-footer a:hover{text-decoration:underline;}
+    </style>
+</head>
+<body>
+<div id="loadingOverlay" style="position:fixed;inset:0;background:#f0f4f9;display:flex;align-items:center;justify-content:center;z-index:9999;">
+    <div class="spinner" style="width:40px;height:40px;display:block;border:4px solid #dadce0;border-top-color:var(--blue);margin-bottom:16px;"></div>
+    <div>Loading PIXLECT Home…</div>
+</div>
+
+<div class="app-container" id="appContainer">
+    <!-- Sign In Page -->
+    <div class="card hidden" id="pageSignIn">
+        <div class="logo-area"><div class="logo-icon">P</div><div class="logo-text">PIXLECT Home</div><div class="logo-subtitle">Sign in to your account</div></div>
+        <h1>Sign in</h1>
+        <p class="subtitle">Use your <strong>@pixlect.com</strong> account or Google</p>
+        <div class="input-group"><label>Email</label><div class="input-wrapper"><input type="email" id="signinEmail" placeholder="you@pixlect.com"></div><div class="error-msg" id="signinEmailError"></div></div>
+        <div class="input-group"><label>Password</label><div class="input-wrapper"><input type="password" id="signinPassword" placeholder="Password"></div><div class="error-msg" id="signinPasswordError"></div></div>
+        <div class="error-msg" id="signinGeneralError"></div>
+        <button class="btn btn-primary" id="btnSignIn" onclick="handleSignIn()"><span class="btn-text">Sign in</span><span class="spinner"></span></button>
+        <div class="divider">or</div>
+        <button class="btn btn-outline" onclick="handleGoogleSignIn()"><span class="btn-text">Sign in with Google</span></button>
+        <div class="links-row"><a onclick="showPage('pageCreateAccount')">Create account</a></div>
+        <div class="links-row" style="margin-top:16px;"><a onclick="showPrivacyPolicy()">Privacy Policy</a></div>
+    </div>
+
+    <!-- Create Account Page -->
+    <div class="card hidden" id="pageCreateAccount">
+        <div class="logo-area"><div class="logo-icon">P</div><div class="logo-text">PIXLECT Home</div></div>
+        <h1>Create account</h1>
+        <p class="subtitle">Your email will be <strong>@pixlect.com</strong></p>
+        <div class="input-group"><label>Username</label><div class="input-wrapper"><input type="text" id="createUsername"><span class="input-suffix">@pixlect.com</span></div><div class="error-msg" id="createUsernameError"></div></div>
+        <div class="input-group"><label>Password</label><div class="input-wrapper"><input type="password" id="createPassword"></div><div class="error-msg" id="createPasswordError"></div></div>
+        <div class="input-group"><label>Confirm</label><div class="input-wrapper"><input type="password" id="createConfirm"></div><div class="error-msg" id="createConfirmError"></div></div>
+        <button class="btn btn-primary" id="btnCreate" onclick="handleCreateAccount()"><span class="btn-text">Create account</span><span class="spinner"></span></button>
+        <div class="links-row"><a onclick="showPage('pageSignIn')">Sign in instead</a></div>
+        <div class="links-row" style="margin-top:16px;"><a onclick="showPrivacyPolicy()">Privacy Policy</a></div>
+    </div>
+
+    <!-- Username Setup Page -->
+    <div class="card hidden" id="pageSetupUsername">
+        <div class="logo-area"><div class="logo-icon">P</div><div class="logo-text">PIXLECT Home</div></div>
+        <h1>Choose your username</h1>
+        <p class="subtitle">You signed in with Google. Pick a username for your <strong>@pixlect.com</strong> address.</p>
+        <div class="input-group"><label>Username</label><div class="input-wrapper"><input type="text" id="setupUsername"><span class="input-suffix">@pixlect.com</span></div><div class="error-msg" id="setupUsernameError"></div></div>
+        <button class="btn btn-primary" id="btnSetup" onclick="handleSetupUsername()"><span class="btn-text">Create inbox</span><span class="spinner"></span></button>
+        <div class="links-row" style="margin-top:16px;"><a onclick="showPrivacyPolicy()">Privacy Policy</a></div>
+    </div>
+
+    <!-- Main App -->
+    <div class="hidden" id="pageMainApp" style="display:flex;flex-direction:column;height:100vh;">
+        <div class="app-bar">
+            <div style="display:flex;align-items:center;gap:20px;">
+                <span style="font-weight:500;">📨 PIXLECT Home</span>
+                <div class="app-bar-nav">
+                    <a class="active" onclick="switchService('mail')">📧 Mail</a>
+                    <a onclick="switchService('chat')">💬 Chat</a>
+                    <a onclick="switchService('contacts')">👥 Contacts</a>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span id="appBarEmail" style="font-size:13px;"></span>
+                <div class="avatar" id="appBarAvatar">U</div>
+                <button class="btn" style="width:auto;height:36px;padding:0 16px;background:#f1f3f4;" onclick="handleSignOut()">🚪 Sign out</button>
+            </div>
+        </div>
+
+        <!-- Mail Panel -->
+        <div class="panel active" id="mailPanel">
+            <div class="inbox-container">
+                <div style="padding:12px;display:flex;justify-content:space-between;background:#fafbfc;">
+                    <span id="realAddressDisplay" style="font-size:13px;color:var(--gray);"></span>
+                    <div>
+                        <button class="btn" style="width:auto;height:36px;" onclick="openCompose()">✏️ Compose</button>
+                        <button class="btn" style="width:auto;height:36px;" onclick="fetchRealEmails()">🔄 Refresh</button>
+                    </div>
+                </div>
+                <div class="email-list" id="emailList"></div>
+                <div class="email-preview-pane" id="emailPreviewPane">
+                    <button onclick="closePreview()" style="margin-bottom:12px;">← Back</button>
+                    <h3 id="previewSubject"></h3>
+                    <div style="color:gray;font-size:13px;" id="previewSender"></div>
+                    <div id="previewBody" style="margin-top:16px;white-space:pre-wrap;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Panel -->
+        <div class="panel" id="chatPanel">
+            <div class="chat-container">
+                <div class="chat-sidebar">
+                    <div style="padding:12px;font-weight:500;">Chats</div>
+                    <div id="chatRoomList" style="overflow-y:auto;flex:1;"></div>
+                    <button class="btn" style="width:auto;margin:12px;" onclick="showCreateRoomModal()">+ New room</button>
+                </div>
+                <div class="chat-main">
+                    <div style="padding:12px;border-bottom:1px solid #e0e0e0;display:flex;justify-content:space-between;">
+                        <span id="chatHeader">Select a room</span>
+                        <button id="addParticipantBtn" onclick="showAddParticipantModal()" style="display:none;">➕ Add</button>
+                    </div>
+                    <div class="chat-messages" id="chatMessages"></div>
+                    <div class="chat-input-container" id="chatInputContainer" style="display:none;">
+                        <input type="text" id="chatInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChatMessage()">
+                        <button class="btn btn-primary" style="width:auto;height:36px;" onclick="sendChatMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contacts Panel -->
+        <div class="panel" id="contactsPanel">
+            <div class="contacts-container">
+                <div style="padding:16px;display:flex;justify-content:space-between;border-bottom:1px solid #e0e0e0;">
+                    <h2>Contacts</h2>
+                    <button class="btn" style="width:auto;" onclick="openAddContact()">+ Add</button>
+                </div>
+                <div class="contacts-list" id="contactsList"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="app-footer">
+            <span>© PIXLECT Studios 2026</span>
+            <span>E-Mail Services Provided By Mail.tm</span>
+            <a onclick="showPrivacyPolicy()">Privacy Policy</a>
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+<div class="modal-overlay" id="composeModal">
+    <div class="modal">
+        <h2>New Message</h2>
+        <input type="email" id="composeTo" placeholder="recipient@example.com">
+        <input type="text" id="composeSubject" placeholder="Subject">
+        <textarea id="composeBody" rows="6" placeholder="Message"></textarea>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
+            <button class="btn" style="width:auto;" onclick="closeCompose()">Cancel</button>
+            <button class="btn btn-primary" style="width:auto;" onclick="sendEmail()">Send</button>
+        </div>
+    </div>
+</div>
+<div class="modal-overlay" id="createRoomModal">
+    <div class="modal">
+        <h2>New Chat Room</h2>
+        <input type="text" id="roomNameInput" placeholder="Room name">
+        <div id="contactsCheckboxList" style="max-height:200px;overflow-y:auto;margin:8px 0;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button class="btn" style="width:auto;" onclick="closeCreateRoomModal()">Cancel</button>
+            <button class="btn btn-primary" style="width:auto;" onclick="createRoom()">Create</button>
+        </div>
+    </div>
+</div>
+<div class="modal-overlay" id="addParticipantModal">
+    <div class="modal">
+        <h2>Add People</h2>
+        <div id="addParticipantCheckboxList" style="max-height:200px;overflow-y:auto;margin:8px 0;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button class="btn" style="width:auto;" onclick="closeAddParticipantModal()">Cancel</button>
+            <button class="btn btn-primary" style="width:auto;" onclick="addParticipantsToRoom()">Add</button>
+        </div>
+    </div>
+</div>
+<!-- Privacy Policy Modal -->
+<div class="modal-overlay" id="privacyModal">
+    <div class="modal">
+        <h2>Privacy Policy</h2>
+        <div style="font-size:14px;line-height:1.6;">
+            <p><strong>Effective Date:</strong> January 1, 2026</p>
+            <p>PIXLECT Studios ("we", "us", or "our") operates the PIXLECT Home platform. This page informs you of our policies regarding the collection, use, and disclosure of personal data when you use our service.</p>
+            <p><strong>Information We Collect:</strong> We collect your email address, authentication provider information (Google or email/password), and messages you send or receive through our platform. Chat messages are stored temporarily for real‑time delivery.</p>
+            <p><strong>How We Use Data:</strong> Your data is used solely to provide and improve the service. We do not sell or share your personal information with third parties.</p>
+            <p><strong>Security:</strong> We implement Firebase security rules and encryption to protect your data. However, no method of transmission over the Internet is 100% secure.</p>
+            <p>If you have any questions, contact us at support@pixlect.com.</p>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+            <button class="btn" style="width:auto;" onclick="closePrivacyPolicy()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCDRcffytG0wlQkKnJ7e1QC-SyZm4hZO2o",
+        authDomain: "pixlect-accounts.firebaseapp.com",
+        databaseURL: "https://pixlect-accounts-default-rtdb.firebaseio.com",
+        projectId: "pixlect-accounts",
+        storageBucket: "pixlect-accounts.firebasestorage.app",
+        messagingSenderId: "555466398813",
+        appId: "1:555466398813:web:8b75f75b5743c0f04081b4"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+    const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+    const MAILTM_BASE = 'https://api.mail.tm';
+    let currentMailbox = null;
+    let allEmails = [];
+    let contacts = [];
+
+    // Helpers
+    function showPage(pageId) {
+        ['pageSignIn','pageCreateAccount','pageSetupUsername','pageMainApp'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+        document.getElementById(pageId).classList.remove('hidden');
+        document.getElementById('appContainer').classList.toggle('wide', pageId === 'pageMainApp');
+    }
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg; t.classList.remove('hidden');
+        clearTimeout(window._tt); window._tt = setTimeout(() => t.classList.add('hidden'), 3000);
+    }
+    function showPrivacyPolicy() {
+        document.getElementById('privacyModal').classList.add('active');
+    }
+    function closePrivacyPolicy() {
+        document.getElementById('privacyModal').classList.remove('active');
+    }
+    function loadContacts() {
+        const key = `pixlect_contacts_${auth.currentUser.uid}`;
+        contacts = JSON.parse(localStorage.getItem(key) || '[]');
+    }
+    function saveContacts() {
+        localStorage.setItem(`pixlect_contacts_${auth.currentUser.uid}`, JSON.stringify(contacts));
+    }
+
+    // Mail
+    async function fetchRealEmails() {
+        if (!currentMailbox) return;
+        try {
+            const res = await fetch(`${MAILTM_BASE}/messages`, {
+                headers: { 'Authorization': `Bearer ${currentMailbox.token}` }
+            });
+            const data = await res.json();
+            allEmails = data['hydra:member'] || data;
+            renderEmailList();
+        } catch (e) { showToast('Failed to fetch emails'); }
+    }
+    function renderEmailList() {
+        const list = document.getElementById('emailList');
+        list.innerHTML = allEmails.length ? '' : '<div style="padding:40px;text-align:center;color:gray;">No emails</div>';
+        allEmails.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = 'email-item' + (msg.read ? '' : ' unread');
+            div.innerHTML = `
+                <span>${msg.from?.address || 'Unknown'}</span>
+                <span style="flex:1;margin-left:12px;">${msg.subject || '(no subject)'}</span>
+                <span style="font-size:12px;color:gray;">${new Date(msg.createdAt).toLocaleTimeString()}</span>
+            `;
+            div.onclick = () => openEmail(msg.id);
+            list.appendChild(div);
+        });
+    }
+    async function openEmail(msgId) {
+        try {
+            const res = await fetch(`${MAILTM_BASE}/messages/${msgId}`, {
+                headers: { 'Authorization': `Bearer ${currentMailbox.token}` }
+            });
+            const msg = await res.json();
+            document.getElementById('previewSubject').textContent = msg.subject;
+            document.getElementById('previewSender').textContent = `${msg.from?.name || ''} <${msg.from?.address}>`;
+            document.getElementById('previewBody').textContent = msg.text || msg.html || '(empty)';
+            document.getElementById('emailPreviewPane').classList.add('active');
+            const email = allEmails.find(e => e.id === msgId);
+            if (email) email.read = true;
+            renderEmailList();
+        } catch (e) { showToast('Failed to open email'); }
+    }
+    function closePreview() {
+        document.getElementById('emailPreviewPane').classList.remove('active');
+    }
+    function openCompose() {
+        document.getElementById('composeModal').classList.add('active');
+    }
+    function closeCompose() {
+        document.getElementById('composeModal').classList.remove('active');
+    }
+    async function sendEmail() {
+        if (!currentMailbox) return;
+        const to = document.getElementById('composeTo').value.trim();
+        const subject = document.getElementById('composeSubject').value;
+        const text = document.getElementById('composeBody').value;
+        if (!to) return showToast('Recipient required');
+        try {
+            await fetch(`${MAILTM_BASE}/messages`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${currentMailbox.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ to: [to], subject, text })
+            });
+            showToast('Email sent!');
+            closeCompose();
+            fetchRealEmails();
+        } catch (e) { showToast('Send failed'); }
+    }
+
+    // Contacts
+    function renderContacts() {
+        const list = document.getElementById('contactsList');
+        list.innerHTML = contacts.length ? '' : '<p style="padding:20px;color:gray;">No contacts</p>';
+        contacts.forEach(c => {
+            const div = document.createElement('div');
+            div.className = 'contact-item';
+            div.innerHTML = `
+                <span>${c.name} &lt;${c.email}&gt;</span>
+                <span>
+                    <button onclick="composeToContact('${c.email}')">✉️</button>
+                    <button onclick="deleteContact('${c.id}')">🗑️</button>
+                </span>`;
+            list.appendChild(div);
+        });
+    }
+    function openAddContact() {
+        const name = prompt('Name:'); if (!name) return;
+        const email = prompt('Email:'); if (!email) return;
+        contacts.push({ id: Date.now().toString(), name, email });
+        saveContacts();
+        renderContacts();
+    }
+    function deleteContact(id) {
+        contacts = contacts.filter(c => c.id !== id);
+        saveContacts();
+        renderContacts();
+    }
+    function composeToContact(email) {
+        switchService('mail');
+        openCompose();
+        document.getElementById('composeTo').value = email;
+    }
+
+    // Live Chat
+    let currentRoomId = null, currentRoomRef = null, messagesListener = null;
+    function switchService(svc) {
+        document.querySelectorAll('.app-bar-nav a').forEach(a => a.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        if (svc === 'mail') {
+            document.querySelector('.app-bar-nav a:nth-child(1)').classList.add('active');
+            document.getElementById('mailPanel').classList.add('active');
+        } else if (svc === 'chat') {
+            document.querySelector('.app-bar-nav a:nth-child(2)').classList.add('active');
+            document.getElementById('chatPanel').classList.add('active');
+            loadChatRooms();
+        } else {
+            document.querySelector('.app-bar-nav a:nth-child(3)').classList.add('active');
+            document.getElementById('contactsPanel').classList.add('active');
+            loadContacts();
+            renderContacts();
+        }
+    }
+    function loadChatRooms() {
+        db.ref('rooms').on('value', snap => {
+            const rooms = snap.val() || {};
+            const list = document.getElementById('chatRoomList');
+            list.innerHTML = '';
+            const userEmail = auth.currentUser.email;
+            Object.entries(rooms).forEach(([id, room]) => {
+                if (room.participants && room.participants.includes(userEmail)) {
+                    const div = document.createElement('div');
+                    div.style.padding = '8px 12px'; div.style.cursor = 'pointer';
+                    div.textContent = room.name;
+                    div.onclick = () => openRoom(id, room);
+                    if (id === currentRoomId) div.style.background = '#e8f0fe';
+                    list.appendChild(div);
+                }
+            });
+        });
+    }
+    function openRoom(id, room) {
+        if (messagesListener) currentRoomRef.child('messages').off('value', messagesListener);
+        currentRoomId = id;
+        currentRoomRef = db.ref(`rooms/${id}`);
+        document.getElementById('chatHeader').textContent = room.name;
+        document.getElementById('addParticipantBtn').style.display = 'inline-block';
+        document.getElementById('chatInputContainer').style.display = 'flex';
+        document.getElementById('chatMessages').innerHTML = '';
+
+        messagesListener = currentRoomRef.child('messages').on('value', snap => {
+            const msgs = snap.val() || {};
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+            Object.values(msgs).sort((a,b) => a.timestamp - b.timestamp).forEach(msg => {
+                const div = document.createElement('div');
+                const isMine = msg.sender === auth.currentUser.email;
+                div.className = `chat-message ${isMine ? 'sent' : 'received'}`;
+                const senderDiv = document.createElement('div');
+                senderDiv.className = 'message-sender';
+                senderDiv.textContent = isMine ? 'You' : (msg.senderName || msg.sender.split('@')[0]);
+                div.appendChild(senderDiv);
+                div.appendChild(document.createTextNode(msg.text));
+                container.appendChild(div);
+            });
+            container.scrollTop = container.scrollHeight;
+        });
+    }
+    function sendChatMessage() {
+        const text = document.getElementById('chatInput').value.trim();
+        if (!text || !currentRoomRef) return;
+        currentRoomRef.child('messages').push({
+            sender: auth.currentUser.email,
+            senderName: auth.currentUser.email.split('@')[0],
+            text,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+        document.getElementById('chatInput').value = '';
+    }
+    function showCreateRoomModal() {
+        document.getElementById('createRoomModal').classList.add('active');
+        const list = document.getElementById('contactsCheckboxList');
+        list.innerHTML = '';
+        contacts.forEach(c => {
+            const label = document.createElement('label');
+            label.style.display = 'block';
+            label.innerHTML = `<input type="checkbox" value="${c.email}"> ${c.name} (${c.email})`;
+            list.appendChild(label);
+        });
+        if (contacts.length === 0) list.innerHTML = '<p>No contacts saved.</p>';
+    }
+    function closeCreateRoomModal() { document.getElementById('createRoomModal').classList.remove('active'); }
+    async function createRoom() {
+        const name = document.getElementById('roomNameInput').value.trim();
+        if (!name) return showToast('Enter room name');
+        const checked = [...document.querySelectorAll('#contactsCheckboxList input:checked')].map(cb => cb.value);
+        const participants = [auth.currentUser.email, ...checked];
+        await db.ref('rooms').push({ name, participants });
+        closeCreateRoomModal();
+        showToast('Room created!');
+    }
+    function showAddParticipantModal() {
+        document.getElementById('addParticipantModal').classList.add('active');
+        const list = document.getElementById('addParticipantCheckboxList');
+        list.innerHTML = '';
+        contacts.forEach(c => {
+            const label = document.createElement('label');
+            label.style.display = 'block';
+            label.innerHTML = `<input type="checkbox" value="${c.email}"> ${c.name} (${c.email})`;
+            list.appendChild(label);
+        });
+    }
+    function closeAddParticipantModal() { document.getElementById('addParticipantModal').classList.remove('active'); }
+    async function addParticipantsToRoom() {
+        const checked = [...document.querySelectorAll('#addParticipantCheckboxList input:checked')].map(cb => cb.value);
+        const snap = await currentRoomRef.child('participants').once('value');
+        const existing = snap.val() || [];
+        const merged = [...new Set([...existing, ...checked])];
+        await currentRoomRef.child('participants').set(merged);
+        closeAddParticipantModal();
+        showToast('Participants added!');
+    }
+
+    // Auth
+    async function handleGoogleSignIn() {
+        try { await auth.signInWithPopup(googleProvider); } catch (e) { showToast(e.message); }
+    }
+    async function handleSignIn() {
+        const email = document.getElementById('signinEmail').value.trim();
+        const pass = document.getElementById('signinPassword').value;
+        try { await auth.signInWithEmailAndPassword(email, pass); } catch (e) { showToast(e.message); }
+    }
+    async function handleCreateAccount() {
+        const username = document.getElementById('createUsername').value.trim();
+        const pass = document.getElementById('createPassword').value;
+        const confirm = document.getElementById('createConfirm').value;
+        if (pass !== confirm) return showToast('Passwords mismatch');
+        try {
+            await auth.createUserWithEmailAndPassword(username + '@pixlect.com', pass);
+        } catch (e) { showToast(e.message); }
+    }
+    async function handleSetupUsername() {
+        const username = document.getElementById('setupUsername').value.trim();
+        if (!username) return showToast('Enter a username');
+        try {
+            const domainsRes = await fetch(`${MAILTM_BASE}/domains`);
+            const domainsData = await domainsRes.json();
+            const domains = domainsData['hydra:member'] || domainsData;
+            const domain = domains[0].domain;
+            const mailAddress = `pixlect_${username}_${Date.now()}@${domain}`;
+            const mailPassword = 'Pix1Secure!';
+            await fetch(`${MAILTM_BASE}/accounts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address: mailAddress, password: mailPassword })
+            });
+            const tokenRes = await fetch(`${MAILTM_BASE}/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address: mailAddress, password: mailPassword })
+            });
+            const tokenData = await tokenRes.json();
+            const mailbox = {
+                address: mailAddress,
+                token: tokenData.token,
+                pixlectDisplay: `${username}@pixlect.com`,
+                password: mailPassword
+            };
+            localStorage.setItem(`pixlect_mailbox_${auth.currentUser.uid}`, JSON.stringify(mailbox));
+            currentMailbox = mailbox;
+            showPage('pageMainApp');
+            document.getElementById('appBarEmail').textContent = mailbox.pixlectDisplay;
+            document.getElementById('appBarAvatar').textContent = username[0].toUpperCase();
+            fetchRealEmails();
+        } catch (e) { showToast('Setup failed: ' + e.message); }
+    }
+    function handleSignOut() {
+        auth.signOut();
+        currentRoomId = null;
+        if (messagesListener) currentRoomRef?.child('messages').off('value', messagesListener);
+    }
+
+    // Auth state
+    auth.onAuthStateChanged(user => {
+        document.getElementById('loadingOverlay').style.display = 'none';
+        if (user) {
+            const mailboxData = localStorage.getItem(`pixlect_mailbox_${user.uid}`);
+            if (mailboxData) {
+                currentMailbox = JSON.parse(mailboxData);
+                showPage('pageMainApp');
+                document.getElementById('appBarEmail').textContent = currentMailbox.pixlectDisplay;
+                document.getElementById('appBarAvatar').textContent = currentMailbox.pixlectDisplay[0].toUpperCase();
+                fetchRealEmails();
+            } else {
+                showPage('pageSetupUsername');
+            }
+            loadContacts();
+        } else {
+            currentMailbox = null;
+            showPage('pageSignIn');
+        }
+    });
+
+    document.getElementById('loadingOverlay').style.display = 'flex';
+</script>
+</body>
+</html>
